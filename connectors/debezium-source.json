@@ -22,11 +22,6 @@
     "topic.creation.default.partitions": "10",
     "topic.creation.default.replication.factor": "1",
     "topic.creation.default.cleanup.policy": "compact",
-    "topic.creation.default.retention.ms": "604800000",    
-    
-    "key.converter.schemas.enable": "false",
-    "value.converter.schemas.enable": "false",
-    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "value.converter": "org.apache.kafka.connect.json.JsonConverter"
+    "topic.creation.default.retention.ms": "604800000"
   }
 }

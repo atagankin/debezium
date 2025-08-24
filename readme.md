@@ -13,3 +13,8 @@ curl -X POST -H "Content-Type: application/json" --data @connectors/debezium-sou
 curl -s http://localhost:8083/connectors/debezium-source-connector/status | jq
 -- Обновить конфигурацию коннектора
 curl -X PUT -H "Content-Type: application/json" --data @connectors/update-connector.json http://localhost:8083/connectors/debezium-source-connector/config
+
+
+-- Регистрация SINK коннектора
+curl -X POST -H "Content-Type: application/json" --data @connectors/jdbc-sink.json http://localhost:8083/connectors
+curl -X DELETE http://localhost:8083/connectors/jdbc-sink-connector
