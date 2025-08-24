@@ -11,3 +11,5 @@ curl -X DELETE http://localhost:8083/connectors/debezium-source-connector
 curl -X POST -H "Content-Type: application/json" --data @connectors/debezium-source.json http://localhost:8083/connectors
 -- Статус коннектора и worker'ов
 curl -s http://localhost:8083/connectors/debezium-source-connector/status | jq
+-- Обновить конфигурацию коннектора
+curl -X PUT -H "Content-Type: application/json" --data @connectors/update-connector.json http://localhost:8083/connectors/debezium-source-connector/config
