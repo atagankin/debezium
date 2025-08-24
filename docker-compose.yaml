@@ -1,0 +1,103 @@
+services:
+  # Zookeeper (требуется для Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+  
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.0.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+
+  # Kafka Connect (с JDBC Connector)
+  kafka-connect:
+    image: debezium/connect:2.7.3.Final
+    depends_on:
+      - kafka
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: connect-cluster
+      CONFIG_STORAGE_TOPIC: connect-configs
+      OFFSET_STORAGE_TOPIC: connect-offsets
+      STATUS_STORAGE_TOPIC: connect-status
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      # Включаем логирование для диагностики
+      LOG_LEVEL: INFO
+      # Настройки для Debezium
+      DEBEZIUM_VERSION: 2.7.3.Final
+    ports:
+      - "8083:8083"
+    volumes:
+      # Подключаем папку с конфигами ОТДЕЛЬНО от системных путей
+      - ./connectors:/custom-connectors
+# For testing newer connector versions, unpack the connector archive into this
+# directory and uncomment the lines below
+#     - ./debezium-connector-postgres:/kafka/connect/debezium-connector-postgres
+
+  ui:
+    image: provectuslabs/kafka-ui:v0.7.0
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+    depends_on:
+      - kafka
+      - kafka-connect
+  
+  # Исходная PostgreSQL (Source)
+  postgres-source:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: source_db
+    ports:
+      - "5432:5432"
+    command: 
+      - bash
+      - -c
+      - |
+        # Запускаем PostgreSQL
+        docker-entrypoint.sh postgres -c config_file=/etc/postgresql/postgresql.conf &
+        
+        # Ждем запуска PostgreSQL
+        while ! pg_isready -U postgres; do sleep 1; done
+                     
+        # Бесконечное ожидание
+        wait
+    volumes:
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./init-source.sql:/docker-entrypoint-initdb.d/init-source.sql
+
+  # Целевая PostgreSQL (Sink)
+  postgres-sink:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sink_db
+    ports:
+      - "5433:5432"    
+    volumes:      
+      - ./init-sink.sql:/docker-entrypoint-initdb.d/init-sink.sql  # Инициализация таблиц
